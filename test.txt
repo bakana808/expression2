@@ -1,0 +1,89 @@
+@name 
+@inputs S:wirelink Up Down Left Right
+@outputs 
+@persist Dir Score HighScore
+@trigger
+
+function nextDir() {
+     Dir = randint(1, 4)
+}
+
+function restartGame() {
+    if(Score > HighScore) {
+        HighScore = Score
+    }
+    Score = 0
+    nextDir()
+}
+
+if(first() || ~S) {
+    Score = 0
+    nextDir()
+    S:egpDrawTopLeft(0)
+    S:egpResolution(vec2(-100, 100), vec2(100, -100))
+}
+
+if(inputClk()) {
+    if(Up || Left || Right || Down) {
+        switch(Dir) {
+            case 1,
+                if(Left) {
+                    Score++
+                    nextDir()    
+                } else {
+                    restartGame()
+                }
+                break
+            case 2,
+                if(Up) {
+                    Score++
+                    nextDir()    
+                } else {
+                    restartGame()
+                }
+                break
+            case 3,
+                if(Right) {
+                    Score++
+                    nextDir()    
+                } else {
+                    restartGame()
+                }
+                break
+            case 4,
+                if(Down) {
+                    Score++
+                    nextDir()    
+                } else {
+                    restartGame()
+                }
+                break        
+        }
+    }
+}
+
+#left arrow
+S:egpPoly(1, vec2(-50, 0), vec2(-25, 25), vec2(-25, -25)) 
+S:egpColor(1, vec(255, 255, 255))
+
+#up
+S:egpPoly(2, vec2(0, 50), vec2(25, 25), vec2(-25, 25))
+S:egpColor(2, vec(255, 255, 255))
+
+#right
+S:egpPoly(3, vec2(50, 0), vec2(25, 25), vec2(25, -25))
+S:egpColor(3, vec(255, 255, 255))
+
+#down
+S:egpPoly(4, vec2(0, -50), vec2(25, -25), vec2(-25, -25))
+S:egpColor(4, vec(255, 255, 255))
+
+S:egpText(5, Score:toString(), vec2(0, 0))
+S:egpAlign(5, 1, 1)
+S:egpFont(5, "Coolvetica", 100)
+
+S:egpText(6, "Highscore: " + HighScore, vec2(-90, 90))
+S:egpAlign(6, 0, 0)
+S:egpFont(6, "Coolvetica", 50)
+
+S:egpColor(Dir, vec(255, 0, 0))

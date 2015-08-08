@@ -1,0 +1,33 @@
+@name Angle Test
+@inputs 
+@outputs 
+@persist Angle:angle Plate:entity Tick:number
+@trigger 
+
+#include "lib/force"
+runOnTick(1)
+runOnChat(1)
+
+Pos = entity():pos() + vec(0, 0, 200)
+
+if(first()) 
+{    
+    Plate = propSpawn("models/hunter/blocks/cube4x4x4.mdl", Pos, 0)      
+    Angle = ang(0, Tick, 0)
+}
+
+if(Plate) 
+{
+    Plate:forcePos(Pos, 20)
+    Plate:forceAng(Angle:setYaw(Tick / 5), 20, 20)
+    #Angle = ang(Tick / 10, 0, Tick / 15)
+}
+
+if(chatClk(owner()))
+{
+    Args = lastSaid():explode(" ")
+    Angle = ang(Args[1, string]:toNumber(), Args[2, string]:toNumber(), Args[3, string]:toNumber())
+}
+    
+Tick++
+

@@ -1,0 +1,70 @@
+@name Hologram Functions
+@persist HoloID:number
+
+if(first()) 
+{
+    HoloID = 0
+    
+    function entity holoCreate()
+    {
+        Holo = holoCreate(HoloID)
+        HoloID++   
+        return Holo 
+    }
+    
+    function void entity:holoColor(Color:vector)
+    {
+        holoColor(holoIndex(This), Color)    
+    }
+    
+    function void entity:holoPos(Pos:vector) {
+        
+        holoPos(holoIndex(This), Pos)   
+    }
+    
+    function void entity:holoParent(E:entity) {
+        
+        holoParent(holoIndex(This), E)
+    }
+    
+    function void entity:holoModel(M:string) {
+        
+        holoModel(holoIndex(This), M)   
+    }
+    
+    function void entity:holoMaterial(M:string) {
+        
+        holoMaterial(holoIndex(This), M)   
+    }
+    
+    function void entity:holoScale(Scale:vector) {
+        
+        holoScaleUnits(holoIndex(This), Scale)   
+    }
+    
+    function vector entity:holoScale() {
+        
+        return holoScaleUnits(holoIndex(This))   
+    }
+    
+    function void entity:holoModel(Model:string)
+    {
+        holoModel(holoIndex(This), Model)   
+    }
+    
+    function void entity:holoAng(Ang:angle) {
+        
+        holoAng(holoIndex(This), Ang)   
+    }
+    
+    function entity entity:holoEntity() {
+        
+        return holoEntity(holoIndex(This))
+    }
+    
+    function void entity:holoDisableShading() 
+    {
+        holoDisableShading(holoIndex(This), 1)    
+    }
+}
+

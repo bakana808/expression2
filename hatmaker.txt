@@ -1,0 +1,56 @@
+@name 
+@inputs 
+@outputs  
+@persist Self:entity ID:number 
+@trigger 
+
+Self = entity()
+
+function number createHolo() {
+    HoloID = ID
+    holoCreate(HoloID)
+    ID++
+    return HoloID
+}
+
+function void createHat(P:entity) {
+    
+    Origin = P:attachmentPos("eyes")
+    
+    H1 = createHolo()
+    holoModel(H1, "hq_cone")
+    holoPos(H1, Origin + vec(0, 0, 20))
+    holoScale(H1, vec(1.6, 1.6, 1.6))
+    holoColor(H1, vec(255, 50, 50))
+    holoParentAttachment(H1, P, "eyes")
+
+    H = createHolo()
+    holoModel(H, "hq_cone")
+    holoPos(H, Origin + vec(0, 0, 20))
+    holoScale(H, vec(-2, -2, -2))
+    holoAng(H, ang(180, 0, 0))
+    holoColor(H, vec(0, 0, 0))
+    holoParent(H, H1)
+    
+    H = createHolo()
+    holoModel(H, "tetra")
+    holoPos(H, Origin + vec(0, 0, 30))
+    holoScale(H, vec(0.8, 0.8, 0.64))
+    holoAng(H, ang(180, 0, 0))
+    holoColor(H, vec(255, 255, 0))
+    holoParent(H, H1)
+    
+    H = createHolo()
+    holoModel(H, "tetra")
+    holoPos(H, Origin + vec(0, 0, 30))
+    holoScale(H, vec(-1, -1, -0.8))
+    holoAng(H, ang(180, 0, 0))
+    holoColor(H, vec(0, 0, 0))
+    holoParent(H, H1)
+    
+}
+
+foreach(I, P:entity=players()) {
+    createHat(P)
+}
+

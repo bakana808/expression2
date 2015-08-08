@@ -1,0 +1,269 @@
+@name 
+@inputs S:wirelink Chair:entity
+
+@persist [ KEY_UP KEY_DOWN KEY_LEFT KEY_RIGHT KEY_START ]:string
+@outputs Player:entity
+@outputs [ UP DOWN LEFT RIGHT START ]:number
+
+@outputs Queue:array Playing:number TimeStart CountDown Session HighScore ID
+@trigger
+
+interval(100)
+    
+if(first() || ~S) 
+{
+
+    function entity getPlayer()
+    {
+        Player = Chair:driver()
+        return Player
+    }
+    
+    function flush() {
+        S:egpClear()
+        S:egpDrawTopLeft(0)
+        S:egpResolution(vec2(-100, 100), vec2(100, -100))
+        ID = 1
+    }
+    
+    function nextDir() {
+        QueueSize = 6
+        if(Queue:count() != QueueSize) {
+            Queue = array()
+            for(I = 0, QueueSize - 1) {
+                Queue:pushNumber(randint(0, 3))    
+            }
+        } else {
+            Queue:removeNumber(1)
+            Queue:pushNumber(randint(0, 3))
+        }
+    }
+    
+    function number isPlaying()
+    {
+        return Playing    
+    }
+    
+    function stopGame(Successful:number)
+    {
+        if(Successful)
+        {
+            Time = round((systime() - TimeStart) * 1000) / 1000
+            print("Finished in " + Time + "s!")
+            if(Time < HighScore) {
+                HighScore = Time
+            }           
+        }
+        else
+        {
+            print("Failed!")
+        }
+
+        Playing = 0
+    }
+    
+    function restartGame() {
+        Playing = 1
+        Session = CountDown
+        nextDir()
+    }
+    
+    function next() {
+        if(!isPlaying()) {
+            TimeStart = systime()
+            print("Start")
+        }
+        Session--
+        if(Session == 0) {
+            stopGame(1)
+        }
+        nextDir()
+    }
+    
+    function number drawTriangle([A B C]:vector2, Color:vector4) {
+        S:egpTriangle(ID, A, B, C)
+        S:egpColor(ID, Color)
+        OldID = ID
+        ID++
+        return OldID   
+    }
+    
+    function number drawBox(Pos:vector2, [W H]:number, Color:vector4) {
+        S:egpBox(ID, Pos, vec2(W, H))
+        S:egpColor(ID, Color)
+        OldID = ID
+        ID++
+        return OldID   
+    }
+    
+    function number drawL(Pos:vector2, Color:vector4) {
+        return drawTriangle(
+            Pos + vec2(-10, 0),
+            Pos + vec2(10, 10),
+            Pos + vec2(10, -10),
+            Color
+        ) 
+    }
+    
+    function number drawU(Pos:vector2, Color:vector4) {
+        return drawTriangle(
+            Pos + vec2(0, 10),
+            Pos + vec2(10, -10),
+            Pos + vec2(-10, -10),
+            Color
+        ) 
+    }
+    
+    function number drawR(Pos:vector2, Color:vector4) {
+        return drawTriangle(
+            Pos + vec2(10, 0),
+            Pos + vec2(-10, 10),
+            Pos + vec2(-10, -10),
+            Color
+        ) 
+    }
+    
+    function number drawD(Pos:vector2, Color:vector4) {
+        return drawTriangle(
+            Pos + vec2(0, -10),
+            Pos + vec2(10, 10),
+            Pos + vec2(-10, 10),
+            Color
+        ) 
+    }
+    
+    KEY_UP = "W"
+    KEY_DOWN = "S"
+    KEY_LEFT = "A"
+    KEY_RIGHT = "D"
+    KEY_START = "SPACE"
+
+    HighScore = 60
+    CountDown = 25
+    Session = CountDown
+    
+    nextDir()
+}
+
+if(getPlayer())
+{
+    Player = getPlayer()
+    
+    UP =    Player:keyPressed(KEY_UP)
+    DOWN =  Player:keyPressed(KEY_DOWN)
+    LEFT =  Player:keyPressed(KEY_LEFT)
+    RIGHT = Player:keyPressed(KEY_RIGHT)
+    START = Player:keyPressed(KEY_START)
+}
+
+flush()
+
+if(isPlaying())
+{
+    if($UP || $LEFT || $RIGHT || $DOWN) {
+        switch(Queue[1, number]) {
+            case 0,
+                if($LEFT) {
+                    next()   
+                } else {
+                    stopGame(0)
+                }
+                break
+            case 1,
+                if($UP) {
+                    next()   
+                } else {
+                    stopGame(0)
+                }
+                break
+            case 2,
+                if($DOWN) {
+                    next()    
+                } else {
+                    stopGame(0)
+                }
+                break        
+            case 3,
+                if($RIGHT) {
+                    next()     
+                } else {
+                    stopGame(0)
+                }
+                break
+        }
+    }        
+}
+else
+{
+    if($START)
+    {
+        restartGame()    
+    }    
+}
+
+S:egpBox(ID,  vec2(0, 0), vec2(200, 200))
+S:egpColor(ID, vec4(50, 50, 50, 255))
+ID++
+
+S:egpText(ID, Session:toString() + " Left", vec2(90, 90))
+S:egpAlign(ID, 2, 0)
+S:egpFont(ID, "Coolvetica", 50)
+ID++
+
+S:egpText(ID, "HS: " + HighScore + "s", vec2(-90, 90))
+S:egpAlign(ID, 0, 0)
+S:egpFont(ID, "Coolvetica", 50)
+ID++
+
+Height = 50
+
+foreach(K, V:number=Queue) {
+    
+    if(K == 1) {
+        ColorA = vec4(25, 25, 25, 255)
+        ColorB = vec4(255, 255, 255, 255)    
+    } else {
+        ColorA = vec4(0, 0, 0, 0)
+        ColorB = vec4(150, 150, 150, 255)
+    }
+    
+    #left
+    TriL = drawL(vec2(-75, Height), ColorA)
+    
+    #up
+    TriU = drawU(vec2(25, Height), ColorA)
+    
+    #down
+    TriD = drawD(vec2(-25, Height), ColorA)
+    
+    #right
+    TriR = drawR(vec2(75, Height), ColorA)
+    
+    switch(V) {
+        case 0,
+            TriSel = TriL
+            break
+        case 1,
+            TriSel = TriU
+            break
+        case 2,
+            TriSel = TriD
+            break
+        case 3,
+            TriSel = TriR
+            break
+    }
+    
+    S:egpColor(TriSel, ColorB)
+
+    Height -= 25 
+       
+}
+
+if(!isPlaying()) {
+    S:egpText(ID, "Press Space to Start", vec2(0, 0))
+    S:egpAlign(ID, 1, 1)
+    S:egpFont(ID, "Coolvetica", 48)
+ID++   
+}
+

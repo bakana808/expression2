@@ -1,0 +1,42 @@
+@name 
+@inputs 
+@outputs 
+@persist [P1 P2]:entity Tick
+@trigger 
+
+#include "lib/force"
+
+runOnTick(1)
+
+if(first()) {
+    entity():propNotSolid(0)
+    
+    rangerPersist(1)
+    rangerReset()
+    rangerFilter(entity())
+    rangerFilter(owner())
+
+    P1 = propSpawn("models/hunter/blocks/cube05x05x05.mdl", entity():pos(), 0)
+    P2 = propSpawn("models/hunter/blocks/cube05x05x05.mdl", entity():pos(), 0)  
+}
+
+VR = owner():pos() + owner():right() * 50 + vec(0, 0, 100)
+VL = owner():pos() - owner():right() * 50 + vec(0, 0, 100)
+
+if(owner():keyAttack2()) {
+    if(Tick <= 8) {
+        P1:forcePos(rangerOffset(999999, owner():shootPos(), owner():eye()):position(), 20)
+        P2:forcePos(VR, 20)
+    } else {
+        P2:forcePos(rangerOffset(999999, owner():shootPos(), owner():eye()):position(), 20)
+        P1:forcePos(VL, 20)   
+    }
+} else {
+    P1:forcePos(VL, 20)
+    P2:forcePos(VR, 20)
+}
+
+Tick++
+if(Tick > 16) {Tick = 0}
+
+

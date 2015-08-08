@@ -1,0 +1,695 @@
+@name kart by octopod
+
+@inputs Seat:entity HUD:wirelink Cam:wirelink 
+@persist Driver:entity
+
+# ===============================
+# the variable used for the main prop of the car
+
+@persist This:entity 
+@persist Mass:number # the mass of the car
+
+# ================================
+# time variable (used for $Time)
+
+@persist Time:number Height:number
+
+# ================================
+# the color of the car (randomly generated)
+
+@persist Color:vector
+
+# ================================
+# car variables
+
+@outputs [MaxFSpeed MaxBSpeed]:number
+@persist SuspensionStrength
+@persist AccelRate DecelRate
+@persist SideFriction:number ForwardFriction:number 
+@persist TurnRate:number
+
+# ================================
+# drift variables
+
+@outputs DriftTriggered:number  # 1 if the car was drifting
+@outputs DriftCooldown:number
+@persist DriftFriction:number # the amount of side velocity of the car (local)
+@persist DriftFrictionLatch:number # the amount of side vel to stop drifting
+
+@persist DriftTurnRate:number
+
+# ================================
+# key bindings
+
+@persist [ KEY_FORWARD KEY_REVERSE KEY_L KEY_R KEY_DRIFT ]:string
+@outputs Gas:number
+
+@outputs Speed:number
+@persist Tires:table 
+@outputs TireRotation:number LTime:number GroundedTires:number
+
+@persist SoundPlaying:number
+
+@trigger none
+@autoupdate
+
+#=======================================================================
+# Hologram Functions
+#=======================================================================
+
+if(first() || dupefinished()) 
+{
+    HoloID = 0
+    
+    function entity holoCreate()
+    {
+        Holo = holoCreate(HoloID)
+        HoloID++   
+        return Holo 
+    }
+    
+    function void entity:holoColor(Color:vector)
+    {
+        holoColor(holoIndex(This), Color)    
+    }
+    
+    function void entity:holoPos(Pos:vector) {
+        
+        holoPos(holoIndex(This), Pos)   
+    }
+    
+    function void entity:holoParent(E:entity) {
+        
+        holoParent(holoIndex(This), E)
+    }
+    
+    function void entity:holoModel(M:string) {
+        
+        holoModel(holoIndex(This), M)   
+    }
+    
+    function void entity:holoMaterial(M:string) {
+        
+        holoMaterial(holoIndex(This), M)   
+    }
+    
+    function void entity:holoScale(Scale:vector) {
+        
+        holoScaleUnits(holoIndex(This), Scale)   
+    }
+    
+    function vector entity:holoScale() {
+        
+        return holoScaleUnits(holoIndex(This))   
+    }
+    
+    function void entity:holoModel(Model:string)
+    {
+        holoModel(holoIndex(This), Model)   
+    }
+    
+    function void entity:holoAng(Ang:angle) {
+        
+        holoAng(holoIndex(This), Ang)   
+    }
+    
+    function entity entity:holoEntity() {
+        
+        return holoEntity(holoIndex(This))
+    }
+    
+    function void entity:holoDisableShading() 
+    {
+        holoDisableShading(holoIndex(This), 1)    
+    }
+}
+
+#===================================================================================
+# Init
+#===================================================================================
+
+if(first() || dupefinished()) # persist variables
+{
+    # the prop the chip is placed on is the main entity
+    This = entity():isWeldedTo()
+    entity():setMaterial("models/debug/debugwhite")
+    entity():setColor(vec(0, 0, 0), 50)
+    
+    This:setColor(vec(0, 0, 0), 0)
+    
+    Seat:setColor(vec(0, 0, 0), 0)
+    Seat:setMass(0)
+    
+    HUD:entity():setColor(vec(0, 0, 0), 0)
+    HUD:entity():setMass(0)
+
+    #===========================
+    # key binding definitions
+    
+    KEY_FORWARD = "W"
+    KEY_REVERSE = "S"
+    KEY_DRIFT = "SPACE"
+    KEY_L = "A"
+    KEY_R = "D"
+
+    DriftFrictionLatch = 80
+
+    Cam["Activated", number] = 1
+
+    Mass = 500
+    AccelRate = 2
+    DecelRate = 0.6
+    MaxFSpeed = 800
+    MaxBSpeed = 400
+    Height = 25 # Units above ground to hover
+    SideFriction = 0.1
+    ForwardFriction = 0.005
+
+    TurnRate =      0.003
+    DriftTurnRate = 0.006
+    SuspensionStrength = 1
+         
+    This:setMass(Mass)
+
+ 
+    runOnTick(1) # run every tick
+
+    rangerPersist(1)
+    rangerFilter(This)
+    rangerFilter(Seat)
+    rangerFilter(owner())
+
+    foreach(K, E:entity = This:getConstraints()) 
+    {
+        E:setMass(1)
+    }
+   
+    function number lerp(Start:number, End:number, Time:number) 
+    {
+        return (1 - Time) * Start + Time * End
+    }
+     
+    function number playSoundGas()
+    {
+        This:soundPlay(1, 0, "vehicles/apc/apc_firstgear_loop1.wav")
+        soundPitch(1, 25)
+    }
+    
+    function void updateSoundGas(Percent:number)
+    {
+        soundPitch(1, lerp(25, 255, Percent))
+    }
+    
+    function void stopSoundGas()
+    {
+        This:soundPlay(2, 3, "vehicles/apc/apc_shutdown.wav")
+        soundStop(1)    
+    }
+
+    function void updateTireHolo(Ranger:ranger, Tire:table, Speed:number, Drifting:number)
+    {
+        #=======================
+        # calculate tire hologram positions
+        #  
+        local TireHolo = Tire["holo", entity]
+        
+        if(!Drifting) {
+            
+            TireRotation += Speed * $Time
+        }          
+        TireHolo:holoPos(Ranger:position() + (This:up() * TireHolo:holoScale():z() / 2))    
+        
+        if(Tire["turning", number]) # turning tires
+        {
+            Quat = qRotation(vec(0, 0, 1), toRad(This:angles():yaw()) + toRad(This:angVel():yaw() * 15)) * qRotation(vec(0, 1, 0), TireRotation)    
+        }
+        else
+        {
+            Quat = qRotation(vec(0, 0, 1), toRad(This:angles():yaw())) * qRotation(vec(0, 1, 0), TireRotation)    
+        }
+        TireHolo:holoAng(This:toWorld(Quat:toAngle()))     
+    }
+        
+    function table newTire(RelPos:vector, Size:number, Side:number, Turning:number)
+    {
+        TireTable = table()
+        TireTable["turning", number] = Turning
+        TireTable["pos", vector] = RelPos
+        TireTable["side", number] = Side
+        
+        Holo = holoCreate()
+        #Holo:holoColor(Color)
+        Holo:holoModel("hq_cylinder")
+        Holo:holoParent(This)
+        Holo:holoModel("models/props_vehicles/carparts_wheel01a.mdl")
+        Holo:holoScale(vec(Size, 8, Size))   
+            
+        TireTable["holo", entity] = Holo
+        TireTable["lastforce", vector] = vec()
+
+        # set trails?
+        Holo:setTrails(0, 100, 1, "trails/laser", Color, 255)
+        
+        updateTireHolo(rangerOffset(Height, This:toWorld(RelPos), -This:up()), TireTable, 0, 0)
+        
+        return TireTable
+    }
+    
+    function table newTire(RelPos:vector, Size:number, Side:number)
+    {
+        return newTire(RelPos, Size, Side, 0)       
+    }
+
+    #[
+        returns if at least one tire is touching a surface
+    ]#
+    function number isGrounded()
+    {
+        return (GroundedTires > 0)
+    }
+    
+    #[
+        returns if all four tires are touching a surface
+    ]#
+    function number isFullyGrounded()
+    {
+        return (GroundedTires == 4)
+    }
+    
+    function number isDrifting(Speed:number)
+    {
+        #[    
+        if(DriftCooldown > 0)
+        {
+            DriftCooldown = min(1, DriftCooldown - $Time)
+        }
+        ]#
+
+        if(Driver:keyPressed(KEY_DRIFT))
+        {
+            #DriftTriggered = 1
+            #DriftCooldown = 1
+            Gas = 0
+            return 1                       
+        }
+
+        return 0
+        #[
+        DriftFriction = abs(This:velL():y())
+
+        if(DriftCooldown > 0 || DriftFriction > DriftFrictionLatch)
+        {
+            return 1    
+        }
+        else
+        {
+            DriftTriggered = 0
+            return 0    
+        }
+        ]#        
+    }
+    
+    function number wasDrifting()
+    {
+        if(DriftTriggered)
+        {
+            DriftTriggered = 0 # also set this back to 0
+            return 1
+        }
+        
+        return 0    
+    }
+
+    Color = hsl2rgb(randint(0, 360), 0.8, 0.5) # random color picker
+    Metal = randint(50, 200)
+    ColorMetal = vec(Metal, Metal, Metal)
+    
+    Tires = table( # array of tire positions
+        newTire(vec(+20, -16, 0), 15, 0, 1),
+        newTire(vec(-20, -16, 0), 23, 0),
+        newTire(vec(+20, +16, 0), 15, 1, 1),
+        newTire(vec(-20, +16, 0), 23, 1)
+    )
+    
+    HUD:egpBox(1, egpScrSize(Driver) / 2, vec2(2, 2))
+    HUD:egpColor(1, vec4(255, 255, 255, 150))
+
+    #==============================
+    # Hologram Model
+    #==============================
+    
+    # Left Bumper
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(1, -16, -6)))
+    H:holoScale(vec(6, 20, 6))
+    H:holoAng(This:toWorld(ang(0, -90, -5)))
+    H:holoModel("right_prism")
+    H:holoParent(This)
+    H:holoColor(ColorMetal)
+    H:holoMaterial("models/shiny")
+
+    #Right Bumper
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(1, +16, -6)))
+    H:holoScale(vec(6, 20, 6))
+    H:holoAng(This:toWorld(ang(0, 90, 5)))
+    H:holoModel("right_prism")
+    H:holoParent(This)
+    H:holoColor(ColorMetal)
+    H:holoMaterial("models/shiny")
+
+    #Front Bumper   
+
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(30, 0, -4)))
+    H:holoAng(This:toWorld(ang(0, 180, 0)))
+    H:holoScale(vec(6, 32, 6))
+    H:holoModel("tetra")
+    H:holoParent(This)
+    H:holoColor(vec(Metal, Metal, Metal))
+    H:holoMaterial("models/shiny")
+
+    #====================================
+    # body
+    
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(0, 0, -2)))
+    H:holoScale(vec(48, 24, 8))
+    H:holoAng(This:toWorld(ang()))
+    H:holoParent(This)
+    H:holoColor(Color)
+    H:holoMaterial("phoenix_storms/gear")
+
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(15.5, 0, 0.5)))
+    H:holoScale(vec(20, 24, 8))
+    H:holoAng(This:toWorld(ang(15, 0, 0)))
+    H:holoParent(This)
+    H:holoColor(Color)
+    H:holoMaterial("phoenix_storms/gear")
+    
+    #====================================
+    # engine
+    
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(-17, 0, 6)))
+    H:holoScale(vec(18, 12, 10))
+    H:holoAng(This:toWorld(ang(0, 90, 0)))
+    H:holoParent(This)
+    H:holoColor(ColorMetal)  
+    H:holoMaterial("phoenix_storms/gear")
+    
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(-21.5, -4, 7.5)))
+    H:holoScale(vec(3, 4, 8))
+    H:holoAng(This:toWorld(ang(0, 90, 0)))
+    H:holoParent(This)
+    H:holoColor(ColorMetal * 1.5)  
+    H:holoMaterial("phoenix_storms/gear")
+    
+    H = holoCreate()
+    H:holoPos(This:toWorld(vec(-21.5, 4, 7.5)))
+    H:holoScale(vec(3, 4, 8))
+    H:holoAng(This:toWorld(ang(0, 90, 0)))
+    H:holoParent(This)
+    H:holoColor(ColorMetal * 1.5)  
+    H:holoMaterial("phoenix_storms/gear")
+    #======================================
+    # exhaust pipes
+    
+    Holo = holoCreate()
+    Holo:holoModel("pyramid")
+    Holo:holoPos(This:toWorld(vec(-20, -10, 6)))
+    Holo:holoAng(This:toWorld(ang(165, 45, 0)))
+    Holo:holoScale(vec(6, 6, 20))
+    Holo:holoParent(This)
+    Holo:holoColor(ColorMetal)
+    Holo:holoMaterial("models/shiny")
+    
+    Holo = holoCreate()
+    Holo:holoModel("pyramid")
+    Holo:holoPos(This:toWorld(vec(-20, 10, 6)))
+    Holo:holoAng(This:toWorld(ang(165, -45, 0)))
+    Holo:holoScale(vec(6, 6, 20))
+    Holo:holoParent(This)
+    Holo:holoColor(ColorMetal)
+    Holo:holoMaterial("models/shiny")
+    
+    #=====================================
+    # chair
+    
+    Holo = holoCreate()
+    Holo:holoPos(This:toWorld(vec(-12, 0, 12)))
+    Holo:holoAng(This:toWorld(ang(-15, 0, 0)))
+    Holo:holoScale(vec(4, 12, 16))
+    Holo:holoParent(This)
+    Holo:holoColor(vec(50, 50, 50))
+    
+    Holo = holoCreate()
+    Holo:holoPos(This:toWorld(vec(-2, 0, 2)))
+    Holo:holoAng(This:toWorld(ang(0, 0, 0)))
+    Holo:holoScale(vec(12, 12, 4))
+    Holo:holoParent(This)
+    Holo:holoColor(vec(50, 50, 50))  
+}
+
+#===================================================================================
+# Update
+#===================================================================================
+
+if(tickClk())
+{
+    GroundedTires = 0
+    
+    Driver = Seat:driver()
+    Time = curtime()
+    
+    VelL = This:velL()
+    Up = This:up()
+    
+    Speed = VelL:x()
+    
+    Drifting = isDrifting(VelL:x())
+  
+    HUD:egpText(2, "" + round(VelL:x()), egpScrSize(Driver) / 2 + vec2(0, 20))
+    HUD:egpAlign(2, 1)
+
+    #Cam["Position", vector] = This:pos() + This:forward() * 200 + This:up() * 200
+    #Cam["Angle", angle] = (This:pos() - Cam["Position", vector]):toAngle()
+    #Cam["Velocity", vector] = This:vel()
+    #Cam["Direction", vector] = (This:pos() - Cam["Position", vector])
+                   
+    #====================================
+    # tire calculations
+    
+    for(I = 1, Tires:count())
+    {        
+        local Tire = Tires[I, table]
+        
+        #=======================
+        # calculate tire force
+
+        local RangerPos = This:toWorld(Tire["pos", vector])
+        local Ranger = rangerOffset(Height, RangerPos, -Up)
+        
+        if(Ranger:hit())
+        {
+            GroundedTires += rangerOffset(Height, This:toWorld(Tire["pos", vector]), -Up):hit()
+
+            local Difference = Height - Ranger:distance()
+            local DeltaDifference = Tire["lastdiff", number]
+
+            local Force =  Ranger:hitNormal() * (Difference * 4 - DeltaDifference * 3.5) * SuspensionStrength * Mass
+
+            This:applyOffsetForce(Force, Ranger:pos())
+
+            Tire["lastdiff", number] = Difference
+            
+            updateTireHolo(Ranger, Tire, VelL:x(), Drifting)
+        }   
+    }
+    
+    if(isFullyGrounded()) 
+    {
+        # =================================
+        # friction
+
+        if(Driver:isValid() && Drifting)
+        {
+            This:applyForce(-This:toWorldAxis(vec(VelL:x() * ForwardFriction, VelL:y() * SideFriction / 5, 0)) * Mass)
+        }
+        else
+        {
+            This:applyForce(-This:toWorldAxis(vec(VelL:x() * ForwardFriction, VelL:y() * SideFriction, 0)) * Mass)
+        }
+        
+        local AngleVelocity = This:angVel():setRoll(0)
+        
+        #AngleVelocity:setRoll(0)
+    
+        # =================================
+        # anti spinning
+        #
+        This:applyAngForce(-AngleVelocity * 12 * ang(This:inertia()))
+    }
+    else 
+    {
+        if(Driver:keyPressed("F"))
+        {
+            This:applyAngForce(-This:angles() * 10 * ang(This:inertia()))
+        }
+    #   This:applyAngForce((-This:angVel()*Mass*1.5):setYaw(0))   
+        #auto-leveling
+        #Torque = This:torqueTo(ang(0, 0, 0)):setZ(0)
+        #Torque = Torque:setX(max(0, Torque:x()))
+        #This:applyTorque((Torque * 5 - This:angVelVector() * 5) * This:inertia())
+        
+        # =================================
+        # gravity
+        #
+        #This:applyForce(vec(0, 0, -9.81) * Mass)
+        
+        # =================================
+        # anti mid-air spinning
+        #
+        #This:applyAngForce(-This:angVel())
+    }
+    
+    if(!isGrounded())
+    {
+        # =================================
+        # anti mid-air spinning
+        #
+        This:applyAngForce(-This:angVel() * 5 * ang(This:inertia()))
+    }
+    
+    if(!Driver:isValid())
+    {
+        if(SoundPlaying)
+        {
+            stopSoundGas()
+            SoundPlaying = 0               
+        }
+    }
+    else
+    {
+        if(!SoundPlaying)
+        {
+            playSoundGas()
+            SoundPlaying = 1    
+        }
+        
+        updateSoundGas(clamp(VelL:x() / MaxFSpeed, 0, 1))
+        
+        if(isFullyGrounded()) 
+        {
+            Forward = This:toWorldAxis(This:toLocalAxis(This:forward()):setZ(0))
+            Vel = This:toWorldAxis(VelL:setZ(0):setY(0))
+          
+            if(isGrounded())
+            {            
+                if(Drifting)
+                {
+                    if(Driver:keyPressed(KEY_FORWARD))
+                    {
+                        This:applyForce((Forward * MaxFSpeed * LTime / 20 - Vel / 20) * Mass)
+                        #This:applyForce((Forward * max(MaxFSpeed, VelL:x()) * LTime - This:vel()) * Mass) 
+                    }
+                }
+                else
+                {
+                    FSpeed = VelL:x()
+                    
+                    if(Driver:keyPressed(KEY_FORWARD) || Driver:keyPressed(KEY_REVERSE))
+                    {
+                        if(!Gas)
+                        {
+                            LTime = min(1, FSpeed / MaxFSpeed)   
+                            Gas = 1   
+                        }
+                        
+                        if(Driver:keyPressed(KEY_FORWARD))
+                        {
+                            LTime += $Time / AccelRate
+                            LTime = min(1, LTime)
+                        }
+                        elseif(Driver:keyPressed(KEY_REVERSE))
+                        {
+                            LTime -= $Time / DecelRate
+                            LTime = max(-1, LTime)
+                        }
+                    }
+                    else
+                    {
+                        if(Gas)
+                        {
+                            Gas = 0
+                        }    
+                    }
+    
+                    if(Gas)
+                    {
+                        if(LTime > 0)
+                        {
+                            This:applyForce((Forward * max(MaxFSpeed, VelL:x()) * LTime - Vel) * Mass) 
+                        }
+                        elseif(LTime < 0)
+                        {
+                            This:applyForce((Forward * MaxBSpeed * LTime - Vel) * Mass)
+                        }
+                    }        
+                }
+    
+                Length = This:vel():length()
+                
+                local LocalTurnRate = TurnRate
+                
+                if(Drifting) {LocalTurnRate = DriftTurnRate}
+    
+                if(Driver:keyPressed(KEY_L)) {
+                    This:applyOffsetForce(-This:right() * Mass * LocalTurnRate * Length, This:toWorld(vec(30, 0, 0)))
+                }
+            
+                if(Driver:keyPressed(KEY_R)) {
+                    This:applyOffsetForce(This:right() * Mass * LocalTurnRate * Length, This:toWorld(vec(30, 0, 0)))
+                }
+            }
+        }
+        
+        elseif(!isGrounded())
+        {
+            if(Driver:keyPressed("LSHIFT"))
+            {
+                if(Driver:keyPressed(KEY_FORWARD))
+                {
+                    This:applyTorque(vec(0, 1, 0) * This:inertia() * 600)    
+                }    
+                elseif(Driver:keyPressed(KEY_REVERSE))
+                {
+                    This:applyTorque(vec(0, -1, 0) * This:inertia() * 600)
+                }
+                
+                if(Driver:keyPressed(KEY_L))
+                {
+                    This:applyTorque(vec(-1, 0, 0) * This:inertia() * 1200)    
+                }    
+                elseif(Driver:keyPressed(KEY_R))
+                {
+                    This:applyTorque(vec(1, 0, 0) * This:inertia() * 1200)
+                }                
+            }
+            else
+            {
+                if(Driver:keyPressed(KEY_L))
+                {
+                    This:applyTorque(vec(0, 0, 1) * This:inertia() * 600)    
+                }    
+                elseif(Driver:keyPressed(KEY_R))
+                {
+                    This:applyTorque(vec(0, 0, -1) * This:inertia() * 600)
+                }               
+            }
+        }
+        
+    }
+}

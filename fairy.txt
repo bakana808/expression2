@@ -1,0 +1,399 @@
+@name Core
+@persist E:entity Mode:number Mass Args:array Tick Alpha FadeEnabled FadeN FadeSpeed FadeRandom ColorList:array [LastColor CurrColor NextColor]:vector
+@outputs Target:vector TargetEntity:entity
+
+@persist CurTime:number
+@outputs Time:number
+
+@persist HoloID:number # for hologram functions
+
+@model models/hunter/misc/sphere025x025.mdl
+@trigger none
+
+CurTime = curtime()
+
+if(!first())
+{
+    Time += $CurTime
+}
+
+if(first())
+{
+    HoloID = 0
+    
+    function entity holoCreate()
+    {
+        Holo = holoCreate(HoloID)
+        HoloID++   
+        return Holo 
+    }
+    
+    function void entity:holoColor(Color:vector)
+    {
+        holoColor(holoIndex(This), Color)    
+    }
+    
+    function void entity:holoPos(Pos:vector) {
+        
+        holoPos(holoIndex(This), Pos)   
+    }
+    
+    function void entity:holoParent(E:entity) {
+        
+        holoParent(holoIndex(This), E)
+    }
+    
+    function void entity:holoModel(M:string) {
+        
+        holoModel(holoIndex(This), M)   
+    }
+    
+    function void entity:holoMaterial(M:string) {
+        
+        holoMaterial(holoIndex(This), M)   
+    }
+    
+    function void entity:holoScale(Scale:vector) {
+        
+        holoScaleUnits(holoIndex(This), Scale)   
+    }
+    
+    function vector entity:holoScale() {
+        
+        return holoScaleUnits(holoIndex(This))   
+    }
+    
+    function void entity:holoModel(Model:string)
+    {
+        holoModel(holoIndex(This), Model)   
+    }
+    
+    function void entity:holoAng(Ang:angle) {
+        
+        holoAng(holoIndex(This), Ang)   
+    }
+    
+    function entity entity:holoEntity() {
+        
+        return holoEntity(holoIndex(This))
+    }
+        
+    function void entity:holoDisableShading() 
+    {
+        holoDisableShading(holoIndex(This), 1)    
+    }
+    
+    function entity:forcePos(Target:vector, Vel, X, Y, Z) {
+        
+        Force = (((Target - This:pos()) * Vel - This:vel()) * This:mass())
+        if(!X) {Force = Force:setX(0)}
+        if(!Y) {Force = Force:setY(0)}
+        if(!Z) {Force = Force:setZ(0)}
+     
+        This:applyForce(Force)
+              
+    }
+    
+    function entity:forcePosOffset(Offset:vector, Target:vector, Vel, X, Y, Z) {
+        
+        Force = (((Target - Offset) * Vel - This:vel()) * This:mass())
+        
+        if(!X) {Force = Force:setX(0)}
+        if(!Y) {Force = Force:setY(0)}
+        if(!Z) {Force = Force:setZ(0)}
+     
+        This:applyOffsetForce(Force, Offset)
+              
+    }
+    
+    function entity:forcePos(Target:vector, Velocity) 
+    {
+        This:forcePos(Target, Velocity, 1, 1, 1)
+    }
+    
+    function entity:forcePosOffset(Offset:vector, Target:vector, Velocity) 
+    {
+        This:forcePosOffset(Offset, Target, Velocity, 1, 1, 1)
+    }
+    
+    function vector entity:torqueTo(Target:angle) 
+    {
+        return This:toLocal(rotationVector(quat(Target) / quat(This:angles())) + This:pos())
+    }
+    
+    function void entity:forceAng(Target:angle, [VelA VelB X Y Z]:number) 
+    {
+        Torque = This:toLocal(rotationVector(quat(Target) / quat(This:angles())) + This:pos())
+        Force = (Torque * VelA - This:angVelVector() * VelB) * This:inertia()
+    
+        if(!X) {Force = Force:setX(0)}
+        if(!Z) {Force = Force:setY(0)}
+        if(!Y) {Force = Force:setZ(0)}
+    
+        This:applyTorque(Force)
+    }
+    
+    function entity:forceAng(Target:angle, [VelA VelB]:number) 
+    {
+        This:forceAng(Target, VelA, VelB, 1, 1, 1)   
+    }
+   
+    #E = propSpawn("models/hunter/misc/sphere075x075.mdl", entity():pos() + vec(0, 0, 200), 0)
+    E = entity()
+    entity():setMass(50)
+        
+    runOnTick(1)
+    runOnChat(1)
+}
+
+if(!E)
+{
+    selfDestructAll()
+}
+
+function initColorList() {
+
+    ColorList = array()
+    ColorList:pushVector(vec(255, 0, 0))       #red
+    ColorList:pushVector(vec(255, 255, 0))     #yellow
+    ColorList:pushVector(vec(0, 0, 255))
+    ColorList:pushVector(vec(0, 255, 0))
+    ColorList:pushVector(vec(0, 255, 255))
+    ColorList:pushVector(vec(255, 0, 255))
+}
+
+#picks next color at random from list
+function nextColor() {
+    
+    LastColor = CurrColor
+    NewColor = ColorList[randint(ColorList:count()), vector]
+    while(NewColor == vec(0, 0, 0) || LastColor == NewColor) {
+        NewColor = ColorList[randint(ColorList:count()), vector]
+    }
+    NextColor = NewColor
+
+}
+
+#sets next color
+function nextColor(Color:vector) {
+    
+    LastColor = CurrColor
+    NextColor = Color
+    
+}
+
+function setColor(Color:vector, Alpha:number) {
+  
+    Dark1 = vec(max(0, Color:x() - 100), max(0, Color:y() - 100), max(0, Color:z() - 100))
+    Dark2 = vec(max(0, Color:x() - 150), max(0, Color:y() - 150), max(0, Color:z() - 150))
+    
+    #holoColor(1, vec(0, 0, 0), 150)
+    holoColor(3, Color, Alpha)
+    holoColor(4, Color, Alpha)
+    holoColor(1, Dark2, Alpha)
+    holoColor(0, Dark1, Alpha)
+    
+    CurrColor = Color
+  
+}
+
+function vector fadeColor(C1:vector, C2:vector, Perc:number) {
+    
+    return vec(
+        (C1:x() * (1 - Perc)) + (C2:x() * Perc),
+        (C1:y() * (1 - Perc)) + (C2:y() * Perc),
+        (C1:z() * (1 - Perc)) + (C2:z() * Perc)
+    )   
+    
+}
+
+if(first()) 
+{
+    initColorList()
+    nextColor()
+    
+    FadeEnabled = 1
+    FadeRandom = 1
+    FadeSpeed = 0.01
+    Mass = 500
+
+    E:setColor(vec(0, 0, 0), 0)
+    
+    rangerPersist(1)
+    rangerReset()
+    rangerFilter(entity())
+    rangerFilter(owner())
+
+    Holo = holoCreate()
+    Holo:holoPos(E:pos())
+    Holo:holoModel("hq_sphere")
+    Holo:holoScale(vec(12, 12, 12))
+    Holo:holoParent(E)
+    Holo:holoDisableShading()
+
+    Holo = holoCreate()
+    Holo:holoPos(E:pos())
+    Holo:holoModel("hq_sphere")
+    Holo:holoScale(vec(-13, -13, -13))
+    Holo:holoParent(E)
+    #holoDisableShading(1, 1)
+#[
+    holoCreate(2)
+    holoModel(2, "hq_sphere")
+    holoScale(2, vec(-2, -2, -2))
+    holoPos(2, E:pos() + vec(2, 2, 2))
+    holoParent(2, 0)
+    holoDisableShading(2, 1)
+  
+    holoCreate(3)
+    holoPos(3, E:pos())
+    holoModel(3, "icosphere")
+    holoScale(3, vec(3.4, 3.4, 3.4))
+    holoParent(3, 0)
+    holoMaterial(3, "models/wireframe")
+    
+    holoCreate(4)
+    holoPos(4, E:pos())
+    holoModel(4, "icosphere")
+    holoScale(4, vec(-2.4, -2.4, -2.4))
+    holoParent(4, 0)
+]#    
+    setColor(NextColor, 255)
+
+    Positions = array(E:pos())
+
+    E:propFreeze(1)
+}
+
+if(tickClk()) 
+{
+    Alpha = 255
+    
+    setMass(Mass)
+        
+    holoAng(3, ang(Tick * 2, Tick * 3, Tick * 4))
+    holoAng(4, ang(Tick * 2, Tick * 3, Tick * 4))
+
+    #Target
+    if(Mode != 3) 
+    {
+        Target = owner():pos() + vec(0, 0, 200)
+    
+        if(owner():keyAttack1()) {
+            if(owner():keyAttack2()) {
+                Target = owner():shootPos() + (owner():eye() * 500)
+            } else {
+                Alpha = 50
+                Target = owner():shootPos() + (owner():eye() * 150)
+            } 
+        } else {
+            if(owner():keyAttack2()) {
+                if(owner():aimEntity():isValid()) {
+                    Target = owner():aimEntity():boxCenter()
+                } else {
+                    Target = rangerOffset(999999, owner():shootPos(), owner():eye()):position()
+                }
+            } else {
+                #owner isn't pressing anything
+                switch(Mode) {
+                    case 1, #aggro mode
+                    
+                        findIncludeClass("player")
+                        findIncludeClass("npc")
+                        findIncludeClass("prop")
+                        findExcludeEntity(owner())
+                        findExcludeEntity(entity())
+                        
+                        findInSphere(owner():pos(), 500)
+                        Entity = findClosest(owner():pos())
+                        
+                        if(Entity:isValid()) {
+                            Target = Entity:pos()
+                        }
+                        
+                        break,
+                        
+                    case 2, #target mode
+                    
+                        if(TargetEntity:isValid()) {
+                            Target = TargetEntity:pos()
+                        }
+                        break
+                                        
+                }
+            }  
+        }
+    }
+    
+    if(E:isPlayerHolding()) {
+        Alpha = 50
+    }
+     
+    #[
+    if(FadeEnabled) {
+        if(FadeRandom && FadeN == 0) {nextColor()}
+        FadeN = min(1, FadeN + FadeSpeed)
+        setColor(fadeColor(LastColor, NextColor, FadeN), Alpha)
+        if(FadeRandom && FadeN >= 1) {FadeN = 0}
+    }
+    ]#
+    
+    if(FadeEnabled)
+    {
+        setColor(hsv2rgb(vec(Time * 100, 1, 1)), Alpha)    
+    }
+    if(Mode != 3) 
+    {
+        E:forcePos(Target, 20)
+        E:forceAng(ang(0, 0, 0), 20, 20)
+    }
+
+}
+
+if(chatClk(owner())) {
+
+    Chat = lastSaid()
+    Parsed = Chat:explode(" ")
+    Root = Parsed[1, string]
+    Parsed:remove(1)
+    Args = Parsed:clone()
+    
+    switch(Root) {
+        case "!",
+            Mode = 0
+            FadeEnabled = 1
+            FadeRandom = 1
+            Mass = 500
+            printColor(vec(200, 200, 200), "Mode: ", vec(255, 150, 0), "Normal")
+            break,
+        case "!aggro",
+            Mode = 1
+            printColor(vec(200, 200, 200), "Mode: ", vec(255, 150, 0), "Aggro")
+            break,
+        case "!target",
+            Mode = 2
+            hideChat(1)
+            TargetEntity = findPlayerByName(Args[1, string])
+            printColor(vec(200, 200, 200), "Mode: ", vec(255, 150, 0), "Targeting '" + TargetEntity:name() + "'")
+            break,
+        case "!off",
+            Mode = 3
+            Mass = 20
+            printColor(vec(200, 200, 200), "Mode: ", vec(255, 150, 0), "Off")
+            break,
+        case "!mass",
+            Mass = Args[1, string]:toNumber()
+            printColor(vec(200, 200, 200), "Set mass to ", vec(255, 150, 0), Mass)
+            E:setMass(Mass)
+            break,
+        case "!color",
+            FadeRandom = 0
+            FadeN = 0
+            R = Args[1, string]:toNumber()
+            G = Args[2, string]:toNumber()
+            B = Args[3, string]:toNumber()
+            nextColor(vec(R, G, B))
+            printColor(vec(200, 200, 200), "Set next color to ", vec(255, 150, 0), "[" + R + ", " + G + ", " + B + "]")
+    }
+}
+

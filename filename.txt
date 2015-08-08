@@ -1,0 +1,20 @@
+@name 
+@inputs 
+@outputs Time:number Quat:quaternion
+@persist 
+@trigger 
+
+if(first())
+{
+    runOnTick(1)
+    holoCreate(1)
+    holoPos(1, entity():pos() + vec(0, 0, 50))   
+    holoModel(1, "models/xeon133/offroad/off-road-20.mdl")
+}
+
+Time = curtime()
+Quat = quat(vec(0, 0, 1)) * qRotation(entity():up(), Time * 10) * qRotation(entity():forward(), Time * 1000)
+
+holoAng(1, Quat:toAngle())
+
+

@@ -1,0 +1,314 @@
+@name 
+@inputs Seat:entity Hud:wirelink
+@persist Angles:angle Trails Color:vector [WorldF WorldR]:vector E:entity [BL_W BR_W FL_W FR_W]:array Acceleration Deceleration SpeedPerc Colors:array Magnet Height MaxFSpeed MaxBSpeed AntiBounce BrakeStrength AngBrakeStrength SuspensionStrength Pos:vector [ForceFL ForceFR ForceBL ForceBR]:vector
+@model models/hunter/plates/plate1x2.mdl
+
+runOnTick(1)
+
+function number interpolate(Time:number) {
+    
+    return Time * Time 
+    
+}
+
+function void setTrails(On:number) {
+    
+    #include "lib/holo"
+    
+    if(On && !Trails) {
+        BL_W:holoEntity():setTrails(20, 10, 10, "trails/smoke", Color, 255)
+        BR_W:holoEntity():setTrails(20, 10, 10, "trails/smoke", Color, 255)
+        Trails = 1
+    }
+    
+    if(!On && Trails) {
+        BL_W:holoEntity():removeTrails()
+        BR_W:holoEntity():removeTrails()
+        Trails = 0        
+    }
+}
+
+if(first() || dupefinished()) {
+    
+    #include "lib/force"
+    #include "lib/holo"
+    
+    Acceleration = 1
+    Deceleration = 2    
+    MaxFSpeed = 1000
+    MaxBSpeed = 400
+    Height = 50 # Units above ground to hover
+    AntiBounce = 5
+    BrakeStrength = 1
+    AngBrakeStrength = 1
+    SuspensionStrength = 0.25
+    
+    Magnet = 100
+        
+    foreach(K,C:entity=E:getConstraints()) {C:setMass(0)}
+
+    #[
+    Colors = array(
+        vec(255, 50, 50),
+        vec(50, 255, 50),
+        vec(50, 50, 255)
+    )
+    ]#
+    
+    #Color = Colors[randint(Colors:count()), vector]
+    Color = vec(randint(0, 255), randint(0, 255), randint(0, 255))
+    Metal = randint(50, 200)
+    E = entity()
+    
+    Angles = E:angles()
+    
+    E:setMass(2000)
+    E:setColor(vec(255, 50, 50), 0)
+    
+    rangerPersist(1)
+    rangerFilter(E)
+    rangerFilter(Seat)
+    rangerFilter(owner())
+
+    FL_W = holoAdd()
+    FL_W:holoColor(vec(40, 40, 50))
+    FL_W:holoModel("hq_cylinder")
+    FL_W:holoParent(E)
+    FL_W:holoScale(vec(30, 30, 10))
+    
+    FR_W = holoAdd()
+    FR_W:holoColor(vec(40, 40, 50))
+    FR_W:holoModel("hq_cylinder")
+    FR_W:holoParent(E)
+    FR_W:holoScale(vec(30, 30, 10))
+
+    BL_W = holoAdd()
+    BL_W:holoColor(vec(50, 50, 50))
+    BL_W:holoModel("hq_cylinder")
+    BL_W:holoParent(E)
+    BL_W:holoScale(vec(40, 40, 10))
+
+    BR_W = holoAdd()
+    BR_W:holoColor(vec(50, 50, 50))
+    BR_W:holoModel("hq_cylinder")
+    BR_W:holoParent(E)
+    BR_W:holoScale(vec(40, 40, 10))
+    
+    #==============================
+    
+    # Left Bumper
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(+25, -2.5, -10)))
+    H:holoScale(vec(15, 40, 15))
+    H:holoAng(E:toWorld(ang(0, 0, 0)))
+    H:holoModel("right_prism")
+    H:holoParent(E)
+    H:holoColor(vec(Metal, Metal, Metal))
+    H:holoMaterial("models/shiny")
+
+    #Right Bumper
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(-25, -2.5, -10)))
+    H:holoScale(vec(15, 40, 15))
+    H:holoAng(E:toWorld(ang(0, 180, 0)))
+    H:holoModel("right_prism")
+    H:holoParent(E)
+    H:holoColor(vec(Metal, Metal, Metal))
+    H:holoMaterial("models/shiny")
+
+    #Front Bumper   
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(0, -70, -10)))
+    H:holoScale(vec(10, 60, 10))
+    H:holoModel("right_prism")
+    H:holoAng(ang(0, Angles:yaw() + 270, 0))
+    H:holoParent(E)
+    H:holoColor(vec(Metal, Metal, Metal))
+    H:holoMaterial("models/shiny")
+    
+    #Body: Bottom
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(0, -10, -10)))
+    H:holoScale(vec(90, 30, 10))
+    H:holoAng(ang(0, Angles:yaw() + 90, 0))
+    H:holoParent(E)
+    H:holoColor(Color)
+    
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(0, 30, 0)))
+    H:holoScale(vec(30, 40, 10))
+    H:holoAng(E:toWorld(ang(0, 0, 0)))
+    H:holoParent(E)
+    H:holoColor(Color)    
+        
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(0, -40, 0)))
+    H:holoScale(vec(20, 40, 10))
+    H:holoAng(E:toWorld(ang(0, 0, 15)))
+    H:holoParent(E)
+    H:holoColor(Color)
+
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(15, -40, 0)))
+    H:holoScale(vec(40, 10, 10))
+    H:holoModel("right_prism")
+    H:holoAng(E:toWorld(ang(0, 0, 15)))
+    H:holoParent(E)
+    H:holoColor(Color)
+    
+    H = holoAdd()
+    H:holoPos(E:toWorld(vec(-15, -40, 0)))
+    H:holoScale(vec(40, 10, 10))
+    H:holoModel("right_prism")
+    H:holoAng(E:toWorld(ang(0, 180, -15)))
+    H:holoParent(E)
+    H:holoColor(Color)
+    
+    holoCreate(13, E:toWorld(vec(15, 50, 0)))
+    holoModel(13, "hexagon")
+    holoScaleUnits(13, vec(20, 20, 40))
+    holoAng(13, ang(45, Angles:yaw() + 90 - 15, 0))
+    holoParent(13, E)
+    holoColor(13, vec(150, 150, 150))
+    holoMaterial(13, "models/shiny")
+    
+    holoCreate(14, E:toWorld(vec(-15, 50, 0)))
+    holoModel(14, "hexagon")
+    holoScaleUnits(14, vec(20, 20, 40))
+    holoAng(14, ang(45, Angles:yaw() + 90 + 15, 0))
+    holoParent(14, E)
+    holoColor(14, vec(150, 150, 150))
+    holoMaterial(14, "models/shiny")
+    
+}
+
+Hud:egpText(1, "Speed: " + round(E:vel():setZ(0):length(), 2), vec2(32, 32))
+
+Angles = E:angles()
+
+FL = E:toWorld(vec(+20, -40, 0))
+FR = E:toWorld(vec(-20, -40, 0))
+BL = E:toWorld(vec(+20, +40, 0))
+BR = E:toWorld(vec(-20, +40, 0))
+
+Up = E:up()
+Forward = E:right()
+Right = E:forward()
+
+WorldF = E:toWorld(Forward)
+WorldR = E:toWorld(Right)
+
+RangeFL = rangerOffset(Magnet, FL, -Up)
+    DistFL = RangeFL:distance()
+RangeFR = rangerOffset(Magnet, FR, -Up)
+    DistFR = RangeFR:distance()
+RangeBL = rangerOffset(Magnet, BL, -Up)
+    DistBL = RangeBL:distance()
+RangeBR = rangerOffset(Magnet, BR, -Up)
+    DistBR = RangeBR:distance()
+    
+function vector wheelPos(Origin:vector, XOffset:number, ZOffset:number) 
+{
+    Vec = Origin + (Right * XOffset) + (Up * ZOffset)
+    return Vec
+}
+
+function vector ranger:tryPos(Vec:vector) {
+    if(This:hit()) {
+        return This:position()    
+    } else {
+        return Vec
+    }
+}
+
+if(RangeFL:hit()) {
+    ForceFL = ((vec(0, 0, 1) + RangeFL:hitNormal()) * (Height - DistFL)) * E:mass() * SuspensionStrength
+    E:applyOffsetForce(ForceFL + $ForceFL * AntiBounce, FL)
+}
+
+if(RangeFR:hit()) {
+    ForceFR = ((vec(0, 0, 1) + RangeFR:hitNormal()) * (Height - DistFR)) * E:mass() * SuspensionStrength
+    E:applyOffsetForce(ForceFR + $ForceFR * AntiBounce, FR)
+}
+
+if(RangeBL:hit()) {
+    ForceBL = ((vec(0, 0, 1) + RangeBL:hitNormal()) * (Height - DistBL)) * E:mass() * SuspensionStrength
+    E:applyOffsetForce(ForceBL + $ForceBL * AntiBounce, BL)
+}
+
+if(RangeBR:hit()) {
+    ForceBR = ((vec(0, 0, 1) + RangeBR:hitNormal()) * (Height - DistBR)) * E:mass() * SuspensionStrength
+    E:applyOffsetForce(ForceBR + $ForceBR * AntiBounce, BR)
+}
+
+FL_W:holoPos(wheelPos(RangeFL:position(), 10, FL_W:holoScale():y()/2))
+FL_W:holoAng(ang(Angles:pitch() + 90, Angles:yaw(), -E:angVel():yaw()/3))
+
+FR_W:holoPos(wheelPos(RangeFR:position(), -10, FR_W:holoScale():y()/2))
+FR_W:holoAng(ang(Angles:pitch() + 90, Angles:yaw(), -E:angVel():yaw()/3))
+
+BL_W:holoPos(wheelPos(RangeBL:position(), 10, BL_W:holoScale():y()/2)) 
+BL_W:holoAng(ang(Angles:pitch() + 90, Angles:yaw(), 0))
+
+BR_W:holoPos(wheelPos(RangeBR:position(), -10, BR_W:holoScale():y()/2))
+BR_W:holoAng(ang(Angles:pitch() + 90, Angles:yaw(), 0)) 
+
+Ground = (RangeFL:hit() || RangeFR:hit() || RangeBR:hit() || RangeBL:hit())
+
+Driver = Seat:driver()
+
+if(!Ground) {
+    #auto-leveling
+    #[
+    Torque = E:torqueTo(ang(0, 0, 0)):setZ(0)
+    Torque = Torque:setX(max(0, Torque:x()))
+    E:applyTorque((Torque * 20 - E:angVelVector() * 5) * E:inertia())
+    ]#
+} else {
+    E:applyAngForce((-E:angVel()*E:mass()*1.5):setYaw(0))
+}
+
+if(Driver) 
+{
+    Eyes = Driver:eyeAngles()
+    
+    if(Driver:keyPressed("W") || Driver:keyPressed("S")) {
+        if(Ground) {
+            SpeedPerc = min(1, SpeedPerc + (Acceleration / 100))
+            if(Driver:keyPressed("W")) {
+                if(Driver:keyPressed("LSHIFT")) {
+                    setTrails(1)
+                    E:applyForce((+E:right() * MaxFSpeed * interpolate(SpeedPerc) / 50 - E:vel() / 50) * E:mass())
+                } else {
+                    setTrails(0)
+                    E:applyForce((+E:right() * MaxFSpeed * interpolate(SpeedPerc) / 15 - E:vel() / 15) * E:mass())
+                }
+            } 
+            elseif(Driver:keyPressed("S")) {
+                E:applyForce((-E:right() * MaxBSpeed * interpolate(SpeedPerc) - E:vel()) * E:mass())
+            }
+        }
+        if(!Ground) {
+            #E:forceAng(ang(Eyes:roll(), Eyes:yaw() + 90, Eyes:pitch()), 40, 20)    
+        }
+
+        E:applyAngForce((-E:angVel()*E:mass()*AngBrakeStrength):setPitch(0):setRoll(0))    
+
+    }
+    
+    if(Driver:keyPressed("A")) {
+        E:applyOffsetForce(-E:forward() * E:mass() * 5 * interpolate(SpeedPerc), E:toWorld(vec(0, 25, 0)))
+    }
+    
+    if(Driver:keyPressed("D")) {
+        E:applyOffsetForce(+E:forward() * E:mass() * 5 * interpolate(SpeedPerc), E:toWorld(vec(0, 25, 0)))
+    } 
+}
+
+if(!first() && (!Driver:keyPressed("W") && !Driver:keyPressed("S") || !Driver)) {
+    SpeedPerc = max(0, SpeedPerc - (Deceleration / 100))
+    Vel = E:vel()
+    Force = ((-$WorldR*E:mass()*4) + (-$WorldF*E:mass()*6)):setZ(0)
+    E:applyForce(Force * (1 - SpeedPerc))
+    E:applyAngForce((-E:angVel()*E:mass()*AngBrakeStrength):setPitch(0):setRoll(0))
+}

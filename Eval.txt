@@ -1,0 +1,360 @@
+@name Eval
+@inputs 
+@outputs 
+@persist Print:string
+@trigger 
+
+runOnChat(1)
+
+function number string:isNumeric() {
+    
+    return This:findRE("[^0-9.]") == 0
+       
+}
+
+function number array:isNumber() {
+    return This[1, string] == "NUMBER"
+}
+
+function array table:token(I:number) {
+    return This[I, array]   
+}
+
+function void table:addToken(Token:array) {
+    This:pushArray(Token)
+}
+
+function void table:addToken(Type:string, Value:string) 
+{
+    This:pushArray(array(Type, Value))       
+}
+
+function void table:addToken(Index:number, Type:string, Value:string) 
+{
+    This:insertArray(Index, array(Type, Value))       
+}
+
+function void table:setToken(Index:number, Type:string, Value:string)
+{
+    This:removeArray(Index)
+    This:insertArray(Index, array(Type, Value))   
+}
+
+#Token Type Functions
+function string array:tType() {
+    return This[1, string]
+}
+
+function void array:tType(S:string) {
+    This[1, string] = S
+}
+
+#Token Value Functions
+function string array:tVal() {
+    return This[2, string]   
+}
+
+function void array:tVal(S:string) {
+    This[2, string] = S
+}
+
+#Operations
+function number op([A B]:number, S:string) {
+    switch(S) {
+        case "+",
+            return A + B,
+        case "-",
+            return A - B,
+        case "*",
+            return A * B,
+        case "/",
+            return A / B,
+        case "^",
+            return A ^ B,
+        default,
+            return 0
+    }   
+}
+
+#Symbol Functions
+function number string:isSymbol() {
+    return (
+        This == "+" || This == "-" ||
+        This == "*" || This == "/" ||
+        This == "^"
+    )
+}
+
+function number string:isExponentialSymbol() {
+    return (This == "^")
+}
+
+function number string:isMultiplicativeSymbol() {
+    return (This == "*" || This == "/")
+}
+
+function number string:isAdditiveSymbol() {
+    return (This == "+" || This == "-")
+}
+
+function string array:string() 
+{
+    return "{" + This:concat(", ") + "}"    
+}
+
+function void table:print() 
+{
+    Return = ""
+    Return += "{"
+    Keys = This:keys()
+    I = 1
+    while(I <= Keys:count())
+    {
+        Key = Keys[I, number]
+        Return += Key + ": " + This[Key, array]:string()
+        I++
+    }
+    Return += "}"
+    print(Return)
+}
+
+function string table:tokenString() {
+    Return = ""
+    Keys = This:keys()
+    I = 1
+    while(I <= Keys:count())
+    {
+        Key = Keys[I, number]
+        Return += This:token(I):tVal()
+        I++
+    }
+    return Return
+}
+
+function string err(String:string) {
+    print(String)
+    return "0"
+}
+
+function table lex(Expr:string) {
+    
+    Tokens = table()
+    Token = array()
+    InParentases = 0
+    
+    Buf = ""
+
+    for(I=1, Expr:length()) 
+    {    
+        C = Expr[I]
+        C1 = Expr[I + 1]
+        C2 = Expr[I - 1]
+        
+        if(C == " ") {continue}
+
+        if(C:isSymbol()) {
+            if(Buf:length() > 0) {Tokens:addToken("UNKNOWN", Buf)}
+            Tokens:addToken("SYMBOL", C)
+            Buf = ""
+            continue
+        }
+        
+        if(C == "(") {
+            if(Buf:length() > 0) {Tokens:addToken("UNKNOWN", Buf)}
+            Tokens:addToken("P_OPEN", C)
+            Buf = ""
+            continue
+        }
+        
+        if(C == ")") {
+            if(Buf:length() > 0) {Tokens:addToken("UNKNOWN", Buf)}
+            Tokens:addToken("P_CLOSE", C)
+            Buf = ""
+            continue
+        }
+        
+        Buf += C
+    }
+    
+    if(Buf:length() > 0) {Tokens:addToken("UNKNOWN", Buf)}
+    
+    for(I=1, Tokens:count()) 
+    {
+        Token = Tokens:token(I)
+        Type = Token:tType()
+        Val = Token:tVal()
+        
+        if(Type == "UNKNOWN") {
+            if(Val:isNumeric()) {
+                Token:tType("NUMBER")
+            } else {
+                Token:tType("LIT")
+            }
+        }
+        
+        elseif(Type == "P_OPEN") {
+
+        }
+    }
+
+    return Tokens
+    
+}
+
+function string parse(Tokens:table) {
+    
+    if(Tokens:count() == 0) {return ""}
+
+    #parentases
+    I = 1
+    while(I <= Tokens:count())
+    {
+        Token = Tokens:token(I)
+        
+        if(Token:tType() == "P_OPEN") 
+        {
+            if(Tokens:token(I - 1):tType() == "NUMBER") {
+                Tokens:addToken(I, "SYMBOL", "*")
+                I++
+            }
+            
+            TempTokens = table()
+            Level = 1
+            Start = I
+            End = Start + 1
+            while(End <= Tokens:count()) {
+                T = Tokens:token(End)
+
+                if(T:tType() == "P_CLOSE") {
+                    Level--
+                }
+                if(T:tType() == "P_OPEN") {
+                    Level++
+                }
+
+                if(Level == 0) {
+                    break
+                } 
+                elseif(End == Tokens:count()) {
+                    return err("Error: Unclosed Parentases")
+                }
+                End++
+            }
+
+            for(K=Start, End) {
+                T = Tokens:removeArray(Start)
+                if(K != Start && K != End) {
+                    TempTokens:addToken(T)
+                }
+            }
+            
+            if(Tokens:token(Start-1):tType() == "LIT") {
+                Func = Tokens:token(Start-1):tVal()
+                Arg = parse(TempTokens)
+                Tokens:remove(Start-1)
+                if(Arg == "") {
+                    Tokens:addToken(Start-1, "NUMBER", Func()[number]:toString())
+                } else {
+                    Tokens:addToken(Start-1, "NUMBER", Func(Arg:toNumber())[number]:toString())
+                }
+            } else {
+                Tokens:addToken(Start, "NUMBER", parse(TempTokens))
+            }
+            
+            I = Start - 1
+
+        }
+        
+        I++
+    }
+    
+    #Tokens:print()
+
+    #exponential
+    I = 1
+    while(I <= Tokens:count()) 
+    {
+        Token = Tokens:token(I)
+
+        if(Token[1, string] == "SYMBOL" && Token[2, string]:isExponentialSymbol())
+        {
+            A = Tokens:token(I-1):tVal()
+            B = Tokens:token(I+1):tVal()
+            if(!A:isNumeric() || !B:isNumeric()) {
+                return err("Error: Cannot operate '" + A + "' and '" + B + "'!")
+            }
+            Tokens:setToken(I, "NUMBER", op(A:toNumber(), B:toNumber(), Token:tVal()):toString())
+            Tokens:remove(I + 1)
+            Tokens:remove(I - 1)
+            I--
+        }
+        I++
+    }
+       
+    #multiplicative    
+    I = 1
+    while(I <= Tokens:count()) 
+    {
+        Token = Tokens:token(I)
+
+        if(Token[1, string] == "SYMBOL" && Token[2, string]:isMultiplicativeSymbol())
+        {
+            A = Tokens:token(I-1):tVal()
+            B = Tokens:token(I+1):tVal()
+            if(!A:isNumeric() || !B:isNumeric()) {
+                return err("Error: Cannot operate '" + A + "' and '" + B + "'!")
+            }
+            Tokens:setToken(I, "NUMBER", op(A:toNumber(), B:toNumber(), Token:tVal()):toString())
+            Tokens:remove(I + 1)
+            Tokens:remove(I - 1)
+            I--
+        }
+        I++
+    }
+    
+    #additive
+    I = 1
+    while(I <= Tokens:count()) 
+    {
+        Token = Tokens:token(I)
+
+        if(Token[1, string] == "SYMBOL" && Token[2, string]:isAdditiveSymbol()) 
+        {
+            A = Tokens:token(I-1):tVal()
+            B = Tokens:token(I+1):tVal()
+            if(!A:isNumeric() || !B:isNumeric()) {
+                return err("Error: Cannot operate '" + A + "' and '" + B + "'!")
+            }
+            Tokens:setToken(I, "NUMBER", op(A:toNumber(), B:toNumber(), Token:tVal()):toString())
+            Tokens:remove(I + 1)
+            Tokens:remove(I - 1)
+            I--
+        }
+        I++
+    }
+
+    return Tokens:token(1):tVal()
+       
+}
+
+if(first()) {Print = ""}
+
+if(Print == "" && chatClk(owner())) {
+
+    hideChat(1)
+    Print = lastSaid() + "=" + parse(lex(lastSaid()))
+    timer("say", 1000)
+    
+} else {
+    if(clk("say"))
+    {
+        concmd("say " + Print)
+        timer("clear", 250)
+    }
+    
+    if(clk("clear"))
+    {
+        Print = ""
+    }
+}
+

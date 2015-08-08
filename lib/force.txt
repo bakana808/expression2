@@ -1,0 +1,61 @@
+@name ApplyForce Functions
+
+if(first())
+{
+    
+    function entity:forcePos(Target:vector, Vel, X, Y, Z) {
+        
+        Force = (((Target - This:pos()) * Vel - This:vel()) * This:mass())
+        if(!X) {Force = Force:setX(0)}
+        if(!Y) {Force = Force:setY(0)}
+        if(!Z) {Force = Force:setZ(0)}
+     
+        This:applyForce(Force)
+              
+    }
+    
+    function entity:forcePosOffset(Offset:vector, Target:vector, Vel, X, Y, Z) {
+        
+        Force = (((Target - Offset) * Vel - This:vel()) * This:mass())
+        
+        if(!X) {Force = Force:setX(0)}
+        if(!Y) {Force = Force:setY(0)}
+        if(!Z) {Force = Force:setZ(0)}
+     
+        This:applyOffsetForce(Force, Offset)
+              
+    }
+    
+    function entity:forcePos(Target:vector, Velocity) 
+    {
+        This:forcePos(Target, Velocity, 1, 1, 1)
+    }
+    
+    function entity:forcePosOffset(Offset:vector, Target:vector, Velocity) 
+    {
+        This:forcePosOffset(Offset, Target, Velocity, 1, 1, 1)
+    }
+    
+    function vector entity:torqueTo(Target:angle) 
+    {
+        return This:toLocal(rotationVector(quat(Target) / quat(This:angles())) + This:pos())
+    }
+    
+    function void entity:forceAng(Target:angle, [VelA VelB X Y Z]:number) 
+    {
+        Torque = This:toLocal(rotationVector(quat(Target) / quat(This:angles())) + This:pos())
+        Force = (Torque * VelA - This:angVelVector() * VelB) * This:inertia()
+    
+        if(!X) {Force = Force:setX(0)}
+        if(!Z) {Force = Force:setY(0)}
+        if(!Y) {Force = Force:setZ(0)}
+    
+        This:applyTorque(Force)
+    }
+    
+    function entity:forceAng(Target:angle, [VelA VelB]:number) 
+    {
+        This:forceAng(Target, VelA, VelB, 1, 1, 1)   
+    }
+   
+}

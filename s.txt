@@ -1,0 +1,14 @@
+@name 
+@persist Target:vector
+@model models/Combine_Helicopter/helicopter_bomb01.mdl
+
+runOnTick(1)
+
+if(first()) {
+    
+}
+
+Target = owner():pos() + vec(0, 0, 100)
+Force = ((Target - entity():pos()) * 10 - entity():vel()) * entity():mass()
+
+entity():applyForce(Force)

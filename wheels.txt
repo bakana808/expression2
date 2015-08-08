@@ -1,0 +1,21 @@
+@name 
+@inputs 
+@outputs 
+@persist 
+@model models/hunter/plates/plate1x1.mdl
+
+runOnTick(1)
+entity():setMass(50)
+
+function forceAng(Targ:angle, Velocity) {
+
+    local E = entity()
+    Force = ((Targ - E:angles()) * Velocity - E:angVel()) * E:mass()
+    Force:setYaw(0)
+    print(round(E:angles(), 2))
+    E:applyAngForce(Force)
+       
+}
+
+forceAng(ang(0, 0, 0), 5)
+    
